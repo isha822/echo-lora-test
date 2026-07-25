@@ -33,6 +33,9 @@ class EchoLoraLinear(nn.Module):
         #Reset parameters
         self.reset_parameters()
 
+        self.echo_signal = None
+        self.echo_mask = None
+
     def reset_parameters(self):
         nn.init.kaiming_uniform_(self.lora_A)
         nn.init.zeros_(self.lora_B)
@@ -48,4 +51,19 @@ class EchoLoraLinear(nn.Module):
         base_output = self.base_layer(x)
         lora_output = (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
-        return base_output + lora_output
+        result = base_output + lora_output
+        
+        if self.echo_signal is not None:
+            #normalize
+            z = torch.nn.functional.layer_norm(
+                self.echo_signal, self.echo_signal.shape[-1:]
+            )
+            z = z.unsqueeze(1)
+            e = self.echo_proj2(torch.tanh(self.echo_proj1(z)))
+            g = torch.sigmoid(self.echo_gate2(torch.tanh(self.echo_gate1(z))))
+            delta = self.lambda_scale * (e * g)
+            mask = self.echo_mask.unsqueeze(-1)
+            result = result + mask * delta
+
+        return result
+    
