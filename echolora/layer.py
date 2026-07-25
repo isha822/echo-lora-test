@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from transformers.pytorch_utils import Conv1D
 
 class EchoLoraLinear(nn.Module):
     def __init__(self, base_layer, r, lora_alpha, lora_dropout=0.0, bottleneck_dim=64):
@@ -10,7 +11,12 @@ class EchoLoraLinear(nn.Module):
         if self.base_layer.bias is not None:
             self.base_layer.bias.requires_grad = False
 
-        out_features, in_features = self.base_layer.weight.shape
+        if isinstance(base_layer, Conv1D):
+            # Conv1D stores (in_features, out_features)
+            in_features, out_features = base_layer.weight.shape
+        else:
+            # nn.Linear stores (out_features, in_features)
+            out_features, in_features = base_layer.weight.shape
 
         self.lora_A = nn.Parameter(torch.empty(r, in_features))
         self.lora_B = nn.Parameter(torch.empty(out_features, r))
