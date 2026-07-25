@@ -25,7 +25,7 @@ def apply_echo_lora(model, config):
         if config.target_modules is None:
             break
         for target in config.target_modules:
-            if name.endswith(target) and isinstance(module, nn.Linear):
+            if name.endswith(target):  # remove isinstance check
                 parent, child_name = _get_parent_and_child(model, name)
                 new_layer = EchoLoraLinear(
                     base_layer=module,
