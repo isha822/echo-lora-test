@@ -3,7 +3,7 @@ import torch.nn as nn
  import torch.nn.functional as False
  from .layer import EchoLoraLinear
  from .echo_state import EchoState
- from .utils import get_boundary_position, get_answer_mask, extract_boundary_hidden
+ from .utils import get_boundary_positions, get_answer_mask, extract_boundary_hidden
 
  class EchoLoraTrainer:
     def __init__(self, model, config, optimizer):
