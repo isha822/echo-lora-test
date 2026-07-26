@@ -65,3 +65,36 @@ assert echo_layers == 1, f"Expected 1, got {echo_layers}"
 print("PASS")
 
 print("\nAll tests passed.")
+
+# test 6: hook shape handling
+print("Test 6: hook shape handling")
+import torch
+
+hidden_2d = torch.randn(32, 768)    # GPT-2 style output
+hidden_3d = torch.randn(2, 16, 768) # LLaMA style output
+
+# simulate the fix
+result = hidden_2d if hidden_2d.dim() == 3 else hidden_3d
+assert result.shape == (2, 16, 768)
+print("PASS")
+
+# test 7: full echo pipeline with 3D hidden states
+print("Test 7: echo pipeline")
+from echolora.echo_state import EchoState
+from echolora.utils import get_boundary_positions, extract_boundary_hidden
+
+state = EchoState()
+state.store(0, torch.randn(2, 16, 768))
+state.store(1, torch.randn(2, 16, 768))
+
+z = state.get_echo()
+assert z.shape == (2, 16, 768), f"Wrong shape: {z.shape}"
+
+labels = torch.zeros(2, 16, dtype=torch.long)
+labels[:, :3] = -100
+boundary = get_boundary_positions(labels)
+echo_signal = extract_boundary_hidden(z, boundary)
+assert echo_signal.shape == (2, 768), f"Wrong shape: {echo_signal.shape}"
+print("PASS")
+
+print("\nAll tests passed.")

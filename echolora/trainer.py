@@ -26,7 +26,11 @@ class EchoLoraTrainer:
             layer = self.model.transformer.h[layer_idx]
 
             def hook(module, input, output, idx=layer_idx):
-                self.echo_state.store(idx, output[0].detach())
+                # output[0] shape varies by architecture
+                # if 2D (batch*seq, hidden) → use input[0] instead
+                # if 3D (batch, seq, hidden) → use directly
+                hidden = output[0] if output[0].dim() == 3 else input[0]
+                self.echo_state.store(idx, hidden.detach())
 
             handles.append(layer.register_forward_hook(hook))
         return handles
