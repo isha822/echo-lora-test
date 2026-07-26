@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
- import torch.nn.functional as False
- from .layer import EchoLoraLinear
- from .echo_state import EchoState
- from .utils import get_boundary_positions, get_answer_mask, extract_boundary_hidden
+import torch.nn.functional as F
+from .layer import EchoLoraLinear
+from .echo_state import EchoState
+from .utils import get_boundary_positions, get_answer_mask, extract_boundary_hidden
 
- class EchoLoraTrainer:
+
+class EchoLoraTrainer:
     def __init__(self, model, config, optimizer):
         self.model = model
         self.config = config
@@ -17,17 +18,19 @@ import torch.nn as nn
         k = self.current_step
         p_start = self.config.p_start
         p_end = self.config.p_end
-        return  p_start + (k / (total_steps - 1)) * (p_end - p_start)
-    
+        return p_start + (k / (total_steps - 1)) * (p_end - p_start)
+
     def _register_source_hooks(self):
         handles = []
         for layer_idx in self.config.source_layers:
             layer = self.model.transformer.h[layer_idx]
+
             def hook(module, input, output, idx=layer_idx):
                 self.echo_state.store(idx, output[0].detach())
+
             handles.append(layer.register_forward_hook(hook))
         return handles
-    
+
     def _set_echo_on_target_layers(self, echo_signal, answer_mask):
         for module in self.model.modules():
             if isinstance(module, EchoLoraLinear):
@@ -39,20 +42,20 @@ import torch.nn as nn
             if isinstance(module, EchoLoraLinear):
                 module.echo_signal = None
                 module.echo_mask = None
-    
+
     def _compute_kd_loss(self, logits_off, logits_on, answer_mask):
         tau = self.config.tau
         q_off = F.softmax(logits_off / tau, dim=-1)
         q_on = F.softmax(logits_on / tau, dim=-1)
-        kl = F.kl_div(q_off.log(), q_on, reduction='none').sum(-1)
+        kl = F.kl_div(q_off.log(), q_on, reduction="none").sum(-1)
         kl = (kl * answer_mask).sum() / answer_mask.sum()
-        return  self.config.lambda_kd * (tau ** 2) * kl
-    
+        return self.config.lambda_kd * (tau**2) * kl
+
     def train_steps(self, input_ids, labels, total_steps):
         self.optimizer.zero_grad()
 
         handles = self._register_source_hooks()
-        #pass 1 - no gradients
+        # pass 1 - no gradients
         with torch.no_grad():
             out_off = self.model(input_ids=input_ids, labels=labels)
             loss_off = out_off.loss
@@ -60,10 +63,10 @@ import torch.nn as nn
 
         for h in handles:
             h.remove()
-        
+
         z = self.echo_state.get_echo()
         boundary = get_boundary_positions(labels)
-        echo_signal = extract_boundary_hidden(z,boundary)
+        echo_signal = extract_boundary_hidden(z, boundary)
 
         answer_mask = get_answer_mask(labels)
 
@@ -75,7 +78,7 @@ import torch.nn as nn
         total_loss = loss_off
 
         if rk == 1:
-            #pass 2
+            # pass 2
             out_on = self.model(input_ids=input_ids, labels=labels)
             loss_on = out_on.loss
             logits_on = out_on.logits
@@ -83,15 +86,10 @@ import torch.nn as nn
             kd_loss = self._compute_kd_loss(logits_off, logits_on, answer_mask)
 
             total_loss = loss_off + loss_on + self.config.lambda_kd * kd_loss
-        
+
         total_loss.backward()
         self.optimizer.step()
         self._clear_echo_on_target_layers()
         self.echo_state.clear()
         self.current_step += 1
         return total_loss.item()
-
-        
-
-
-

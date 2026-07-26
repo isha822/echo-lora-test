@@ -4,7 +4,7 @@ from .layer import EchoLoraLinear
 
 def _get_parent_and_child(model, target_name):
     """Given 'transformer.h.0.attn.c_attn', return (parent_module, 'c_attn')"""
-    parts = target_name.split('.')
+    parts = target_name.split(".")
     parent = model
     for part in parts[:-1]:
         parent = getattr(parent, part)
