@@ -27,11 +27,11 @@ class EchoLoraLinear(nn.Module):
         
         #echo projection network
         self.echo_proj1 = nn.Linear(in_features, bottleneck_dim, bias = False)
-        self.echo_proj2 = nn.Linear(bottleneck_dim, in_features, bias = False)
+        self.echo_proj2 = nn.Linear(bottleneck_dim, out_features, bias = False)
         
         #echo gate network
         self.echo_gate1 = nn.Linear(in_features, bottleneck_dim, bias = False)
-        self.echo_gate2 = nn.Linear(bottleneck_dim, in_features, bias = True)
+        self.echo_gate2 = nn.Linear(bottleneck_dim, out_features, bias = True)
         
         #learnable scale
         self.lambda_scale = nn.Parameter(torch.ones(1) * 0.1)
